@@ -339,7 +339,7 @@ class MainServer extends WsServer {
     }
     // End @todo //
 
-    this.core.stats.increment('incoming-data', data.length / 1024 / 1024)    // 字节 => MB
+    this.core.stats.increment('incoming-data', data.length / 1024 / 1024)    // 字节 => MiB
 
     // Execute `in` (incoming data) hooks and process results
     payload = this.executeHooks('in', socket, payload);

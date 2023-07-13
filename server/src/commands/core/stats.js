@@ -30,16 +30,15 @@ export async function run(core, server, socket) {
 ### 服务器状态
 当前连接数：${server.clients.size}
 封禁IP数量：${(core.stats.get('users-banned') || 0)}
-有效入站数据：${core.stats.get('incoming-data')} MB
-有效出站数据：${core.stats.get('outgoing-data')} MB
+有效入站数据：${core.stats.get('incoming-data')} MiB
+有效出站数据：${core.stats.get('outgoing-data')} MiB
 稳定运行时长：${formatTime(process.hrtime(core.stats.get('start-time')))}
 ### 服务器统计
 用户加入次数：${(core.stats.get('users-joined') || 0)}
 信息发送次数：${(core.stats.get('messages-sent') || 0)}
 踢出用户次数：${(core.stats.get('users-kicked') || 0)}
 状态请求次数：${(core.stats.get('stats-requested') || 0)}`,
-  }, socket);
-
+  }, socket); //注：MB和MiB不同 1MB=1000KB 1MiB=1024KiB
   // stats are fun
   core.stats.increment('stats-requested');
 }
