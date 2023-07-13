@@ -12,14 +12,9 @@
     "npm": ">= 6.7.0"
   },
   "scripts": {
-    "start": "pm2 startOrReload pm2.config.js",
-    "stop": "pm2 stop pm2.config.js && pm2 delete pm2.config.js",
+    "start": "node -r esm server/main.js",
     "config": "node -r esm server/src/scripts/configure.js",
-    "postinstall": "npm run config",
-    "logs": "pm2 logs",
-    "clear": "pm2 flush",
-    "status": "pm2 list",
-    "refresh": "pm2 flush && pm2 stop pm2.config.js && pm2 delete pm2.config.js"
+    "postinstall": "npm run config"
   },
   "author": "MrZhang365",
   "license": "Apache-20",

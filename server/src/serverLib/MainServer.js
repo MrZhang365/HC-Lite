@@ -231,8 +231,10 @@ class MainServer extends WsServer {
         this.emit('connection', client, req)
       })
     })
-
     this.http.listen(this.core.config.port)
+    this.http.once('listening', () => {
+      console.info(`Server started, port: ${this.core.config.port}`)
+    })
   }
 
   /**

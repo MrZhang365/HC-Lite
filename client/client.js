@@ -112,7 +112,7 @@ var verifyNickname = function (nick) {
 var frontpage = [
 	'# HackChat轻量版',
 	'---',
-	'欢迎来到 HackChat轻量版，这是一个由[HackChat](https://github.com/hack-chat/main)改编的轻量级聊天室，适用于个人站长，用于临时开设聊天室服务器',
+	'欢迎来到 HackChat轻量版，这是一个由[HackChat](https://github.com/hack-chat/main)改编的轻量级聊天室，适用于个人站长，用于临时开设聊天室服务器。',
 	'与 HackChat 不同的是，这里只有一个频道，并且做了一些人性化的修改。',
 	'想要开始聊天？点击[此处](?channel)即可加入频道。',
 	'---',
