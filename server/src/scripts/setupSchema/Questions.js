@@ -11,7 +11,7 @@
 const Questions = {
   properties: {
     tripSalt: {
-      description: 'Salt (leave as default)',
+      description: '盐值（留空则使用默认值）',
       type: 'string',
       hidden: true,
       replace: '*',
@@ -21,20 +21,12 @@ const Questions = {
       },
     },
 
-    adminName: {
-      description: 'Admin Nickname',
-      pattern: /^"?[a-zA-Z0-9_]+"?$/,
-      type: 'string',
-      message: 'Nicks can only contain letters, numbers and underscores',
-      before: (value) => value.replace(/"/g, ''),
-    },
-
     adminTrip: {
       type: 'string',
       hidden: true,
       replace: '*',
-      description: 'Admin Password',
-      message: 'You must enter or re-enter a password',
+      description: '站长密码',
+      message: '您必须输入一个密码',
       before: (value) => {
         const crypto = require('crypto');
         const sha = crypto.createHash('sha256');
@@ -43,10 +35,10 @@ const Questions = {
       },
     },
 
-    websocketPort: {
+    port: {
       type: 'integer',
-      message: 'The port may only be a number!',
-      description: 'Websocket Port',
+      message: '端口必须是一个整数',
+      description: '端口',
       default: '6060',
     },
   },

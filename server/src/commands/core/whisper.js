@@ -27,33 +27,19 @@ export async function run(core, server, socket, payload) {
   // check user input
   const text = parseText(payload.text);
 
-  if (!text) {
-    // lets not send objects or empty text, yea?
-    return server.police.frisk(socket.address, 13);
-  }
-
   // check for spam
   const score = text.length / 83 / 4;
   if (server.police.frisk(socket.address, score)) {
-    return server.reply({
-      cmd: 'warn',
-      text: 'You are sending too much text. Wait a moment and try again.\nPress the up arrow key to restore your last message.',
-    }, socket);
+    return server.replyWarn(`您发送私信的速度太快了，请稍后再试`, socket)
   }
 
   const targetNick = payload.nick;
-  if (!UAC.verifyNickname(targetNick)) {
-    return true;
-  }
 
   // find target user
   let targetClient = server.findSockets({ channel: socket.channel, nick: targetNick });
 
   if (targetClient.length === 0) {
-    return server.reply({
-      cmd: 'warn',
-      text: 'Could not find user in channel',
-    }, socket);
+    return server.replyWarn(`找不到目标用户`, socket)
   }
 
   [targetClient] = targetClient;
@@ -63,7 +49,8 @@ export async function run(core, server, socket, payload) {
     type: 'whisper',
     from: socket.nick,
     trip: socket.trip || 'null',
-    text: `${socket.nick} whispered: ${text}`,
+    text: `${socket.nick} 向您发送私信: ${text}`,
+    message: text,
   }, targetClient);
 
   targetClient.whisperReply = socket.nick;
@@ -71,82 +58,39 @@ export async function run(core, server, socket, payload) {
   server.reply({
     cmd: 'info',
     type: 'whisper',
-    text: `You whispered to @${targetNick}: ${text}`,
+    text: `您向 ${targetNick} 发送私信: ${text}`,
+    message: text,
   }, socket);
+
+  core.stats.increment('messages-sent');
 
   return true;
 }
 
-// module hook functions
-export function initHooks(server) {
-  server.registerHook('in', 'chat', this.whisperCheck.bind(this), 20);
-}
-
-// hooks chat commands checking for /whisper
-export function whisperCheck(core, server, socket, payload) {
-  if (typeof payload.text !== 'string') {
-    return false;
-  }
-
-  if (payload.text.startsWith('/whisper') || payload.text.startsWith('/w ')) {
-    const input = payload.text.split(' ');
-
-    // If there is no nickname target parameter
-    if (input[1] === undefined) {
-      server.reply({
-        cmd: 'warn',
-        text: 'Refer to `/help whisper` for instructions on how to use this command.',
-      }, socket);
-
-      return false;
-    }
-
-    const target = input[1].replace(/@/g, '');
-    input.splice(0, 2);
-    const whisperText = input.join(' ');
-
-    this.run(core, server, socket, {
-      cmd: 'whisper',
-      nick: target,
-      text: whisperText,
-    });
-
-    return false;
-  }
-
-  if (payload.text.startsWith('/r ')) {
-    if (typeof socket.whisperReply === 'undefined') {
-      server.reply({
-        cmd: 'warn',
-        text: 'Cannot reply to nobody',
-      }, socket);
-
-      return false;
-    }
-
-    const input = payload.text.split(' ');
-    input.splice(0, 1);
-    const whisperText = input.join(' ');
-
-    this.run(core, server, socket, {
-      cmd: 'whisper',
-      nick: socket.whisperReply,
-      text: whisperText,
-    });
-
-    return false;
-  }
-
-  return payload;
-}
-
-export const requiredData = ['nick', 'text'];
 export const info = {
   name: 'whisper',
-  description: 'Display text on targets screen that only they can see',
+  aliases: ['w'],
+  description: '向某人发送私信',
   usage: `
     API: { cmd: 'whisper', nick: '<target name>', text: '<text to whisper>' }
-    Text: /whisper <target name> <text to whisper>
-    Text: /w <target name> <text to whisper>
-    Alt Text: /r <text to whisper, this will auto reply to the last person who whispered to you>`,
+    以聊天形式发送 /whisper 目标昵称 信息
+    以聊天形式发送 /w 目标昵称 信息
+    （快速回复）以聊天形式发送 /reply 信息
+    （快速回复）以聊天形式发送 /r 信息`,
+  runByChat: true,
+  dataRules: [
+    {
+      name: 'nick',
+      verify: UAC.verifyNickname,
+      errorMessage: UAC.nameLimit.nick,
+      required: true,
+    },
+    {
+      name: 'text',
+      verify: text => !!parseText(text),
+      errorMessage: '您想表达什么？',
+      required: true,
+      all: true,
+    },
+  ],
 };

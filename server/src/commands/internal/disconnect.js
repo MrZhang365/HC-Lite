@@ -24,9 +24,14 @@ export async function run(core, server, socket, data) {
   return true;
 }
 
-export const requiredData = ['cmdKey'];
 export const info = {
   name: 'disconnect',
-  usage: 'Internal Use Only',
-  description: 'Internally used to relay `onlineRemove` event to clients',
+  usage: '内部调用',
+  description: '发送用户离开的通知',
+  dataRules: [
+    {
+      name: 'cmdKey',
+      required: true,
+    }
+  ]
 };

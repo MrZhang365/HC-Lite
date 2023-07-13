@@ -6,6 +6,9 @@ import {
   relative,
 } from 'path';
 import didYouMean from 'didyoumean2';
+import {
+  isRegExp,
+} from 'util';
 
 // default command modules path
 const CmdDir = 'src/commands';
@@ -42,14 +45,6 @@ class CommandManager {
       * @type {Array}
       */
     this.categories = [];
-
-    /**
-      * Full path to config.json file
-      * @type {String}
-      */
-    if (typeof this.core.config.logErrDetailed === 'undefined') {
-      this.core.config.logErrDetailed = false;
-    }
   }
 
   /**
@@ -127,10 +122,10 @@ class CommandManager {
     * @return {String} Module errors or null if none
     */
   validateCommand(object) {
-    if (typeof object !== 'object') { return 'command setup is invalid'; }
-    if (typeof object.run !== 'function') { return 'run function is missing'; }
-    if (typeof object.info !== 'object') { return 'info object is missing'; }
-    if (typeof object.info.name !== 'string') { return 'info object is missing a valid name field'; }
+    if (typeof object !== 'object') { return '模块无效'; }
+    if (typeof object.run !== 'function') { return '丢失run函数'; }
+    if (typeof object.info !== 'object') { return '丢失info对象'; }
+    if (typeof object.info.name !== 'string') { return 'info对象的name属性有误'; }
 
     return null;
   }
@@ -188,9 +183,83 @@ class CommandManager {
     * @param {Object} server main server object
     */
   initCommandHooks(server) {
-    this.commands.filter((c) => typeof c.initHooks !== 'undefined').forEach(
-      (c) => c.initHooks(server),
+    this.commands.filter((c) => typeof c.initHooks === 'function').forEach(
+      (c) => { c.initHooks(server) },
     );
+  }
+
+  /**
+   * 通过命令模块info对象的dataRules属性验证用户输入值是否正确
+   * @param {Array} rules 命令模块info对象的dataRules属性
+   * @param {Object} data 数据
+   * @returns {String|true} 如果是字符串，则代表报错；如果是true，则代表验证成功
+   */
+
+  verifyData(rules, data) {
+    const missing = []
+    let i = 0
+
+    if (typeof data.nick === 'string') {
+      var nickArr = data.nick.split('#')
+      nickArr[0] = nickArr[0].replace(/@/g, '')
+      data.nick = nickArr.join('#')
+    }
+
+    for (i in rules) {
+      if (typeof data[rules[i].name] === 'undefined' && !rules[i].required) continue
+      if (typeof data[rules[i].name] === 'undefined') {
+        // 丢了个参数
+        missing.push(rules[i].name)
+        continue    // 继续执行下一次循环
+      }
+
+      if (typeof rules[i].verify === 'function') {
+        // 参数验证模式：自定义函数
+        // 返回值类型为string则报错，为false返回errorMessage的内容（没有则返回默认报错内容），为true则说明验证通过
+        let result = rules[i].verify(data[rules[i].name])
+
+        if (result === true) continue
+
+        return result || rules[i].errorMessage || `错误：参数 ${rules[i].name} 的值有误，请查证后再试`    // 报错
+
+      }else if (isRegExp(rules[i].verify)) {
+        // 参数验证模式：正则表达式
+        if (!rules[i].verify.test(data[rules[i].name])) {
+          // 验证失败
+          return rules[i].errorMessage || `错误：参数 ${rules[i].name} 的值有误，请查证后再试`    // 报错
+        }
+      }
+    }
+
+    if (missing.length !== 0) {
+      // 如果真的丢失参数，则返回错误信息
+      return `错误：您没有提供参数 ${missing.join('、')}`
+    }
+    return true
+  }
+
+  parseText(rules, text) {
+    // 实例：/color 44FF00
+
+    var data = {}
+    var textArray = text.split(' ')
+
+    data.cmd = textArray[0].slice(1)
+
+    for (let i = 0; i < rules.length; i++) {    // Do you know the rules? You know the rules and so do I~
+      if (!textArray[i + 1]) {
+        return data
+      }
+
+      if (rules[i].all) {
+        data[rules[i].name] = textArray.slice(i + 1).join(' ')
+        return data
+      }
+      
+      data[rules[i].name] = textArray[i + 1]
+    }
+
+    return data
   }
 
   /**
@@ -232,7 +301,7 @@ class CommandManager {
       return this.handleCommand(server, socket, {
         cmd: 'socketreply',
         cmdKey: server.cmdKey,
-        text: `Command not found, did you mean: \`${maybe}\`?`,
+        text: `没有这个命令，你是不是想输入：\`${maybe}\`？`,
       });
     }
 
@@ -240,7 +309,7 @@ class CommandManager {
     return this.handleCommand(server, socket, {
       cmd: 'socketreply',
       cmdKey: server.cmdKey,
-      text: 'Unknown command',
+      text: `找不到 \`${data.cmd}\` 命令，请执行 \`help\` 命令来查看所有的命令`,
     });
   }
 
@@ -254,23 +323,26 @@ class CommandManager {
     * @return {*} Arbitrary module return data
     */
   async execute(command, server, socket, data) {
-    if (typeof command.requiredData !== 'undefined') {
-      const missing = [];
-      for (let i = 0, len = command.requiredData.length; i < len; i += 1) {
-        if (typeof data[command.requiredData[i]] === 'undefined') { missing.push(command.requiredData[i]); }
-      }
-
-      if (missing.length > 0) {
-        console.log(`Failed to execute '${
-          command.info.name
-        }': missing required ${missing.join(', ')}\n\n`);
-
+    if (Array.isArray(command.info.dataRules)) {
+      // 命令模块要求检查用户输入值是否合法
+      const msg = this.verifyData(command.info.dataRules, data)
+      if (typeof msg === 'string') {
         this.handleCommand(server, socket, {
           cmd: 'socketreply',
           cmdKey: server.cmdKey,
-          text: `Failed to execute '${
-            command.info.name
-          }': missing required ${missing.join(', ')}\n\n`,
+          text: msg,
+        });
+
+        return null;
+      }
+    }
+
+    if (typeof command.info.level === 'number') {    // 如果命令模块限制了最低权限
+      if (typeof socket.level !== 'number' || socket.level < command.info.level) {    // 如果用户没有等级（未加入频道）或等级不够
+        this.handleCommand(server, socket, {
+          cmd: 'socketreply',
+          cmdKey: server.cmdKey,
+          text: `抱歉，您的权限不足，无法执行 \`${command.info.name}\` 命令，请检查权限后再试`,
         });
 
         return null;
@@ -280,7 +352,7 @@ class CommandManager {
     try {
       return await command.run(this.core, server, socket, data);
     } catch (err) {
-      const errText = `Failed to execute '${command.info.name}': `;
+      const errText = `# :(\n# 非常无语，服务器在执行 ${command.info.name} 命令时出现了未知错误，无法为您提供相应的服务。\n### 小张聊天室的部分技术暂不成熟，出错是在所难免的，敬请谅解。\n您可以将此错误报告给开发者以帮助我们改进服务器。\n错误信息：\n`;
 
       // If we have more detail enabled, then we get the trace
       // if it isn't, or the property doesn't exist, then we'll get only the message

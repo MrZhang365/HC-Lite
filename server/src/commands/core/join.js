@@ -27,11 +27,6 @@ export function parseNickname(core, data) {
   const nickArray = data.nick.split('#', 2);
   userInfo.nick = nickArray[0].trim();
 
-  if (!UAC.verifyNickname(userInfo.nick)) {
-    // return error as string
-    return 'Nickname must consist of up to 24 letters, numbers, and underscores';
-  }
-
   let password = undefined;
   // prioritize hash in nick for password over password field
   if (typeof nickArray[1] === 'string') {
@@ -40,25 +35,19 @@ export function parseNickname(core, data) {
     password = data.password;
   }
 
-  if (hash(password + core.config.tripSalt) === core.config.adminTrip) {
-    userInfo.uType = 'admin'; /* @legacy */
-    userInfo.trip = 'Admin';
-    userInfo.level = UAC.levels.admin;
-  } else if (userInfo.nick.toLowerCase() === core.config.adminName.toLowerCase()) {
-    // they've got the main-admin name while not being an admin
-    return 'You are not the admin, liar!';
-  } else if (password) {
-    userInfo.trip = hash(password + core.config.tripSalt);
+  if (password) {
+    userInfo.trip = hash(password + core.config.tripSalt)
   }
 
-  // TODO: disallow moderator impersonation
-  // for (const mod of core.config.mods) {
-  core.config.mods.forEach((mod) => {
-    if (userInfo.trip === mod.trip) {
-      userInfo.uType = 'mod'; /* @legacy */
-      userInfo.level = UAC.levels.moderator;
-    }
-  });
+  if (core.config.mods.includes(userInfo.trip)) {
+    userInfo.uType = 'mod'
+    userInfo.level = UAC.levels.moderator
+  }
+
+  if (userInfo.trip === core.config.adminTrip) {
+    userInfo.uType = 'admin'
+    userInfo.level = UAC.levels.admin
+  }
 
   return userInfo;
 }
@@ -67,48 +56,28 @@ export function parseNickname(core, data) {
 export async function run(core, server, socket, data) {
   // check for spam
   if (server.police.frisk(socket.address, 3)) {
-    return server.reply({
-      cmd: 'warn',
-      text: 'You are joining channels too fast. Wait a moment and try again.',
-    }, socket);
+    server.replyWarn(`您加入频道的速度太快了，请稍后再试`)
+    return socket.terminate()
   }
 
   // calling socket already in a channel
-  if (typeof socket.channel !== 'undefined') {
-    return true;
-  }
-
-  // check user input
-  if (typeof data.channel !== 'string' || typeof data.nick !== 'string') {
-    return true;
-  }
-
-  const channel = data.channel.trim();
-  if (!channel) {
-    // must join a non-blank channel
-    return true;
-  }
+  if (socket.joined) return server.replyWarn(`您已经加入频道了`, socket)
 
   const userInfo = this.parseNickname(core, data);
   if (typeof userInfo === 'string') {
-    return server.reply({
-      cmd: 'warn',
-      text: userInfo,
-    }, socket);
+    server.replyWarn(userInfo, socket)
+    return socket.terminate()
   }
 
   // check if the nickname already exists in the channel
   const userExists = server.findSockets({
-    channel: data.channel,
+    joined: true,
     nick: (targetNick) => targetNick.toLowerCase() === userInfo.nick.toLowerCase(),
   });
 
   if (userExists.length > 0) {
     // that nickname is already in that channel
-    return server.reply({
-      cmd: 'warn',
-      text: 'Nickname taken',
-    }, socket);
+    return server.replyWarn(`已经有人使用了此昵称`, socket)
   }
 
   userInfo.hash = server.getSocketHash(socket);
@@ -120,7 +89,7 @@ export async function run(core, server, socket, data) {
 
   // TODO: place this within it's own function allowing import
   // prepare to notify channel peers
-  const newPeerList = server.findSockets({ channel: data.channel });
+  const newPeerList = server.findSockets({ joined: true });
   const nicks = []; /* @legacy */
   const users = [];
 
@@ -132,7 +101,6 @@ export async function run(core, server, socket, data) {
     hash: userInfo.hash,
     level: userInfo.level,
     userid: userInfo.userid,
-    channel: data.channel,
   };
 
   // send join announcement and prep online set
@@ -141,13 +109,7 @@ export async function run(core, server, socket, data) {
     nicks.push(newPeerList[i].nick); /* @legacy */
 
     users.push({
-      nick: newPeerList[i].nick,
-      trip: newPeerList[i].trip,
-      utype: newPeerList[i].uType, /* @legacy */
-      hash: newPeerList[i].hash,
-      level: newPeerList[i].level,
-      userid: newPeerList[i].userid,
-      channel: data.channel,
+      ...UAC.getUserDetails(newPeerList[i]),
       isme: false,
     });
   }
@@ -156,7 +118,6 @@ export async function run(core, server, socket, data) {
   socket.uType = userInfo.uType; /* @legacy */
   socket.nick = userInfo.nick;
   socket.trip = userInfo.trip;
-  socket.channel = data.channel; /* @legacy */
   socket.hash = userInfo.hash;
   socket.level = userInfo.level;
   socket.userid = userInfo.userid;
@@ -169,7 +130,6 @@ export async function run(core, server, socket, data) {
     hash: socket.hash,
     level: socket.level,
     userid: socket.userid,
-    channel: data.channel,
     isme: true,
   });
 
@@ -180,16 +140,28 @@ export async function run(core, server, socket, data) {
     users,
   }, socket);
 
+  socket.joined = true
+
   // stats are fun
   core.stats.increment('users-joined');
 
   return true;
 }
 
-export const requiredData = ['channel', 'nick'];
 export const info = {
   name: 'join',
-  description: 'Place calling socket into target channel with target nick & broadcast event to channel',
+  description: '加入频道',
   usage: `
-    API: { cmd: 'join', nick: '<your nickname>', password: '<optional password>', channel: '<target channel>' }`,
+    API: { cmd: 'join', nick: '<your nickname>', password: '<optional password>' }`,
+  dataRules: [
+    {
+      name: 'nick',
+      required: true,
+      verify: nick => UAC.verifyNickname(nick.split('#')[0]),
+      errorMessage: UAC.nameLimit.nick,
+    },
+    {
+      name: 'password'
+    },
+  ],
 };

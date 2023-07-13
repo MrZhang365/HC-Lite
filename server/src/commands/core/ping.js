@@ -7,5 +7,5 @@ export async function run() { }
 
 export const info = {
   name: 'ping',
-  description: 'This module is only in place to supress error notices legacy sources may get',
+  description: 'ping一下服务器',
 };

@@ -4,7 +4,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta charset="utf-8">
-  <title>hack.chat</title>
+  <title>HackChat轻量版</title>
   <link rel="manifest" href="manifest.json">
 
   <link rel="stylesheet" href="style.css">
@@ -35,55 +35,53 @@
   </footer>
   <nav id="sidebar">
     <div id="sidebar-content" class="hidden">
-      <h4>Settings</h4>
+      <h4>设置</h4>
       <p>
         <input id="pin-sidebar" type="checkbox">
-        <label for="pin-sidebar">Pin sidebar</label>
+        <label for="pin-sidebar">固定侧边栏</label>
       </p>
       <p>
         <input id="sound-switch" type="checkbox">
-        <label for="sound-switch">Sound notifications</label>
+        <label for="sound-switch">铃声通知</label>
       </p>
       <p>
         <input id="notify-switch" type="checkbox">
-        <label for="notify-switch">Screen notifcations</label>
+        <label for="notify-switch">桌面通知</label>
       </p>
       <p>
         <input id="joined-left" type="checkbox" checked>
-        <label for="joined-left">Join/left notify</label>
+        <label for="joined-left">加入/离开 提示</label>
       </p>
       <p>
         <input id="parse-latex" type="checkbox" checked>
-        <label for="parse-latex">Allow LaTeX</label>
+        <label for="parse-latex" title="在特殊情况下可能会造成浏览器崩溃">启用LaTeX数学公式</label>
       </p>
       <p>
         <input id="syntax-highlight" type="checkbox" checked>
-        <label for="syntax-highlight">Allow Highlight</label>
+        <label for="syntax-highlight">启用代码高亮</label>
       </p>
       <p>
         <input id="allow-imgur" type="checkbox">
-        <label for="allow-imgur" title="Embed images like: ![Title](https://i.imgur.com/image.png)">Allow Imgur</label>
+        <label for="allow-imgur" title="使用Markdown语法发送图片：![Title](https://i.imgur.com/image.png)">显示图片</label>
       </p>
       <hr>
       <p>
-        <h4>Color scheme</h4>
+        <h4>色彩主题</h4>
         <select id="scheme-selector"></select>
       </p>
       <p>
-        <h4>Highlight scheme</h4>
+        <h4>高亮样式</h4>
         <select id="highlight-selector"></select>
       </p>
       <hr>
       <p>
-        <button id="clear-messages">Clear all messages</button>
+        <button id="clear-messages">清除所有信息</button>
       </p>
       <hr>
-      <h4>Users online</h4>
-      <p>(Click user to invite)</p>
+      <h4>在线用户</h4>
       <ul id="users"></ul>
     </div>
   </nav>
   <script src="client.js"></script>
 </body>
-
 </html>

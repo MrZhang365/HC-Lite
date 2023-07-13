@@ -5,5 +5,5 @@
   */
 
 console.log('');
-console.log('Config generated! You may now start the server normally.');
+console.log('服务器配置完毕，感谢您选择HackChat轻量版。');
 console.log('');

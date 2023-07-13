@@ -108,11 +108,32 @@ export function getUserDetails(socket) {
 }
 
 /**
+  * 名称的限制
+  * @typedef {Object} nameLimit
+  * @property {string} nick 昵称的要求
+  * @property {string} channel 频道名称的要求
+  */
+export const nameLimit = {
+  nick: '昵称只能由中文、字母、数字和下划线组成，且不能超过24个字符',
+  trip: '识别码只能由大小写英文字母、数字、`/` 和 `+` 组成，且长度必须为6位',
+};
+
+/**
   * Returns true if the nickname is valid
   * @public
   * @param {string} nick Nickname to verify
   * @return {boolean}
   */
 export function verifyNickname(nick) {
-  return /^[a-zA-Z0-9_]{1,24}$/.test(nick);
+  return typeof nick === 'string' && /^[\u4e00-\u9fa5_a-zA-Z0-9]{1,24}$/.test(nick);
+}
+
+/**
+  * Returns true if the trip is valid
+  * @public
+  * @param {string} trip Trip to verify
+  * @return {boolean}
+  */
+export function verifyTrip(trip) {
+  return typeof trip === 'string' && /^[a-zA-Z0-9/\+]{6}$/.test(trip);
 }

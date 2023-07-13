@@ -79,7 +79,7 @@ class ConfigManager {
 
       return true;
     } catch (err) {
-      console.log(`Failed to save config file: ${err}`);
+      console.log(`无法加载服务器配置：${err}`);
 
       return false;
     }

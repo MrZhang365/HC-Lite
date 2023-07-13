@@ -65,13 +65,13 @@ class ImportsManager {
 
           this.imports[dirName][file] = imported;
         } catch (e) {
-          const err = `Unable to load modules from ${dirName} (${relative(dir, file)})\n${e}`;
+          const err = `无法导入模块：${dirName} (${relative(dir, file)})\n${e}`;
           errorText += err;
           console.error(err);
         }
       });
     } catch (e) {
-      const err = `Unable to load modules from ${dirName}\n${e}`;
+      const err = `无法导入此路径的模块：${dirName}\n${e}`;
       errorText += err;
       console.error(err);
       return errorText;
@@ -92,6 +92,9 @@ class ImportsManager {
     Object.keys(this.imports).forEach((dir) => {
       Object.keys(this.imports[dir]).forEach((mod) => {
         delete require.cache[require.resolve(mod)];
+
+        // 上面的代码删了require的缓存，但是似乎忽略了 this.imports，我不知道这是不是BUG，也许是故意这么做的。
+        delete this.imports[dir][mod];    // 删掉 this.imports
       });
 
       errorText += this.loadDir(dir);

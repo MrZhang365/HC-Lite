@@ -46,7 +46,7 @@ class CoreApp {
     this.config = await this.configManager.load();
 
     if (this.config === false) {
-      console.error('Missing config.json, have you run: npm run config');
+      console.error('找不到 config.json，请尝试运行 npm run config');
       process.exit(0);
     }
   }

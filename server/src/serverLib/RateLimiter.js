@@ -87,52 +87,6 @@ class RateLimiter {
 
     return false;
   }
-
-  /**
-    * Statically set server to no longer accept traffic from `id`
-    * @param {String} id target id / address
-    * @example
-    * // Usage within a command module:
-    * let badClient = server.findSockets({ channel: socket.channel, nick: targetNick });
-    * server.police.arrest(badClient[0].address, badClient[0].hash);
-    * @public
-    * @return {void}
-    */
-  arrest(id, hash) {
-    const record = this.search(id);
-
-    record.arrested = true;
-    this.hashes[hash] = id;
-  }
-
-  /**
-    * Remove statically assigned limit from `id`
-    * @param {String} id target id / address
-    * @example
-    * // Usage within a command module:
-    * server.police.pardon('targetHashOrIP');
-    * @public
-    * @return {void}
-    */
-  pardon(id) {
-    let targetId = id;
-    if (typeof this.hashes[targetId] !== 'undefined') {
-      targetId = this.hashes[targetId];
-    }
-
-    const record = this.search(targetId);
-    record.arrested = false;
-  }
-
-  /**
-    * Clear all records
-    * @public
-    * @return {void}
-    */
-  clear() {
-    this.records = {};
-    this.hashes = [];
-  }
 }
 
 export default RateLimiter;

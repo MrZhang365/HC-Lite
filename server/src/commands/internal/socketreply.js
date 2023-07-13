@@ -15,9 +15,18 @@ export async function run(core, server, socket, data) {
   return true;
 }
 
-export const requiredData = ['cmdKey', 'text'];
 export const info = {
   name: 'socketreply',
-  usage: 'Internal Use Only',
-  description: 'Internally used to relay warnings to clients',
+  usage: '内部调用',
+  description: '发送warn',
+  dataRules: [
+    {
+      name: 'cmdKey',
+      required: true
+    },
+    {
+      name: 'text',
+      required: true,
+    }
+  ],
 };

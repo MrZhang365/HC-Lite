@@ -26,26 +26,17 @@ export async function run(core, server, socket, data) {
   // check user input
   const text = parseText(data.text);
 
-  if (!text) {
-    // lets not send objects or empty text, yea?
-    return server.police.frisk(socket.address, 13);
-  }
-
   // check for spam
   const score = text.length / 83 / 4;
   if (server.police.frisk(socket.address, score)) {
-    return server.reply({
-      cmd: 'warn',
-      text: 'You are sending too much text. Wait a moment and try again.\nPress the up arrow key to restore your last message.',
-    }, socket);
+    return server.replyWarn(`您聊天过于频繁，请稍后再试。\n按下向上按钮即可恢复刚刚没有发出去的信息。`, socket)
   }
 
   // build chat payload
   const payload = {
     cmd: 'chat',
-    nick: socket.nick,
+    ...UAC.getUserDetails(socket),
     text,
-    level: socket.level,
   };
 
   if (UAC.isAdmin(socket.level)) {
@@ -59,7 +50,7 @@ export async function run(core, server, socket, data) {
   }
 
   // broadcast to channel peers
-  server.broadcast(payload, { channel: socket.channel });
+  server.broadcast(payload, { joined: true });
 
   // stats are fun
   core.stats.increment('messages-sent');
@@ -69,26 +60,7 @@ export async function run(core, server, socket, data) {
 
 // module hook functions
 export function initHooks(server) {
-  server.registerHook('in', 'chat', this.commandCheckIn.bind(this), 20);
   server.registerHook('in', 'chat', this.finalCmdCheck.bind(this), 254);
-}
-
-// checks for miscellaneous '/' based commands
-export function commandCheckIn(core, server, socket, payload) {
-  if (typeof payload.text !== 'string') {
-    return false;
-  }
-
-  if (payload.text.startsWith('/myhash')) {
-    server.reply({
-      cmd: 'info',
-      text: `Your hash: ${socket.hash}`,
-    }, socket);
-
-    return false;
-  }
-
-  return payload;
 }
 
 export function finalCmdCheck(core, server, socket, payload) {
@@ -102,25 +74,41 @@ export function finalCmdCheck(core, server, socket, payload) {
 
   if (payload.text.startsWith('//')) {
     payload.text = payload.text.substr(1);
-
     return payload;
   }
 
-  server.reply({
-    cmd: 'warn',
-    text: `Unknown command: ${payload.text}`,
-  }, socket);
+  const cmd = payload.text.split(' ')[0].slice(1)
+  const command = core.commands.get(cmd)
+
+  if (!command) {
+    core.commands.handleFail(server, socket, { cmd })
+    return false
+  }
+
+  if (command.info.runByChat) {
+    if (Array.isArray(command.info.dataRules)) {
+      const data = core.commands.parseText(command.info.dataRules, payload.text)
+      core.commands.handleCommand(server, socket, data)
+      return false
+    }
+  }
+
+  core.commands.handleFail(server, socket, { cmd })
 
   return false;
 }
 
-export const requiredData = ['text'];
 export const info = {
   name: 'chat',
-  description: 'Broadcasts passed `text` field to the calling users channel',
+  description: '向所有用户发送一条信息',
   usage: `
-    API: { cmd: 'chat', text: '<text to send>' }
-    Text: Uuuuhm. Just kind type in that little box at the bottom and hit enter.\n
-    Bonus super secret hidden commands:
-    /myhash`,
+    API: { cmd: 'chat', text: '<text to send>' }`,
+  dataRules: [
+    {
+      name: 'text',
+      required: true,
+      verify: text => !!parseText(text),
+      errorMessage: '您想表达什么？',
+    },
+  ],
 };

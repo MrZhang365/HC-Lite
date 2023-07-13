@@ -2,8 +2,13 @@ import {
   Server as WsServer,
   OPEN as SocketReady,
 } from 'ws';
+import { createServer } from 'http';
+import * as url from 'url'
 import { createHash } from 'crypto';
 import RateLimiter from './RateLimiter';
+import * as path from 'path'
+import { contentType } from 'mime-types'
+import * as fs from 'fs'
 
 import { ServerConst } from '../utility/Constants';
 
@@ -21,7 +26,7 @@ class MainServer extends WsServer {
     * @param {CoreApp} core Reference to the global core object
     */
   constructor(core) {
-    super({ port: core.config.websocketPort });
+    super({ noServer: true, });
 
     /**
       * Stored reference to the core
@@ -59,6 +64,8 @@ class MainServer extends WsServer {
       */
     this.cmdBlacklist = {};
 
+    this.bannedIPs = Array.isArray(core.config.bannedIPs) ? core.config.bannedIPs : []
+
     /**
       * Stored info about the last server error
       * @type {ErrorEvent}
@@ -82,6 +89,61 @@ class MainServer extends WsServer {
   }
 
   /**
+   * 封禁一个IP地址
+   * @param {String} ip 
+   * @returns {Boolean}
+   */
+  ban(ip) {
+    if (this.bannedIPs.includes(ip)) return false
+    this.bannedIPs.push(ip)
+    this.core.stats.set('users-banned', this.bannedIPs.length)
+    this.core.configManager.set('bannedIPs', this.bannedIPs)
+    return true
+  }
+
+  /**
+   * 解封一个IP地址
+   * @param {String} ip 
+   * @returns {Boolean}
+   */
+  unban(ip) {
+    if (!this.bannedIPs.includes(ip)) return false
+    this.bannedIPs = this.bannedIPs.filter(i => i !== ip)
+    this.core.stats.set('users-banned', this.bannedIPs.length)
+    this.core.configManager.set('bannedIPs', this.bannedIPs)
+    return true
+  }
+
+  /**
+   * 解封所有IP地址
+   * @returns {void}
+   */
+  unbanall() {
+    this.bannedIPs = []
+    this.core.configManager.set('bannedIPs', this.bannedIPs)
+    this.core.stats.set('users-banned', this.bannedIPs.length)
+  }
+
+  /**
+   * 判断一个IP是否被封禁
+   * @param {String} ip 
+   * @returns {Boolean}
+   */
+  isBanned(ip) {
+    return this.bannedIPs.includes(ip)
+  }
+
+  /**
+   * 通过请求对象获取IP
+   * @param {http#Request} req 请求
+   * @returns {String} IP
+   */
+  getIP(req) {
+    if (typeof req.headers['X-Forwarded-For'] === 'string') return req.headers['X-Forwarded-For'].split(',')[0]
+    return req.socket.remoteAddress.startsWith('::ffff:') ? req.socket.remoteAddress.replace('::ffff:', '') : req.socket.remoteAddress
+  }
+
+  /**
     * Create ping interval and setup server event listeners
     * @private
     * @return {void}
@@ -96,6 +158,81 @@ class MainServer extends WsServer {
     this.on('connection', (socket, request) => {
       this.newConnection(socket, request);
     });
+
+    this.setupHttpServer()
+  }
+
+  /**
+   * 创建一个HTTP服务器
+   * @private
+   * @return {void}
+   */
+  setupHttpServer() {
+    this.http = createServer()
+    this.http.on('request', (req, res) => {
+      if (this.isBanned(this.getIP(req))) res.writeHead(302, 'Banned', {
+        Location: 'https://1145.s3.ladydaily.com/rock.mp4'
+      }).end()
+
+      if (req.method !== 'GET') {
+        res.writeHead(405, 'Method Not Allowed', {
+          'Content-Type': contentType('.txt'),
+        })
+
+        return res.end('Your method is not GET')
+      }
+
+      const pathname = url.parse(decodeURI(req.url)).pathname
+      const target = path.join(__dirname, '../../..', 'client', pathname === '/' ? 'index.html' : pathname)
+
+      if (!target.startsWith(path.join(__dirname, '../../..', 'client'))) {    // 防止路径逃逸
+        res.writeHead(400, 'Fuck You', {
+          'Content-Type': contentType('.txt'),
+        })
+        return res.end('Fuck You')
+      }
+
+      if (!fs.existsSync(target)) {
+        res.writeHead(404, 'Not Found', {
+          'Content-Type': contentType('.txt'),
+        })
+        return res.end('4n0n4me Not Found')
+      }
+
+      if (!fs.statSync(target).isFile()) {
+        res.writeHead(404, 'Not Found', {
+          'Content-Type': contentType('.txt'),
+        })
+        return res.end('4n0n4me Not Found')
+      }
+
+      fs.readFile(target, (err, data) => {
+        if (err) {
+          res.writeHead(500, 'Internal Server Error', {
+            'Content-Type': contentType('.txt'),
+          })
+          return res.end('Failed to read ' + target)
+        }
+
+        res.writeHead(200, 'OK', {
+          'Content-Type': contentType(path.extname(target)),
+        })
+
+        res.write(data)
+        res.end()
+      })
+    })
+
+    this.http.on('upgrade', (req, socket, head) => {
+      if (url.parse(req.url).pathname !== '/websocket') return socket.destroy()
+      if (this.isBanned(this.getIP(req))) return socket.destroy()
+      
+      this.handleUpgrade(req, socket, head, client => {
+        this.emit('connection', client, req)
+      })
+    })
+
+    this.http.listen(this.core.config.port)
   }
 
   /**
@@ -157,7 +294,7 @@ class MainServer extends WsServer {
       this.core.commands.handleCommand(this, socket, {
         cmd: 'socketreply',
         cmdKey: this.cmdKey,
-        text: 'You are being rate-limited or blocked.',
+        text: '您的操作过于频繁，请稍后再试',
       });
 
       return;
@@ -189,15 +326,11 @@ class MainServer extends WsServer {
       * Issue #1: hard coded `cmd` check
       * Issue #2: hard coded `cmd` value checks
       */
-    if (typeof payload.cmd === 'undefined') {
-      return;
-    }
-
     if (typeof payload.cmd !== 'string') {
       return;
     }
 
-    if (typeof socket.channel === 'undefined' && (payload.cmd !== 'join' && payload.cmd !== 'chat')) {
+    if (!socket.joined && (payload.cmd !== 'join' && payload.cmd !== 'chat')) {
       return;
     }
 
@@ -205,6 +338,8 @@ class MainServer extends WsServer {
       return;
     }
     // End @todo //
+
+    this.core.stats.increment('incoming-data', data.length / 1024 / 1024)    // 字节 => MB
 
     // Execute `in` (incoming data) hooks and process results
     payload = this.executeHooks('in', socket, payload);
@@ -289,6 +424,7 @@ class MainServer extends WsServer {
     try {
       if (socket.readyState === SocketReady) {
         socket.send(JSON.stringify(outgoingPayload));
+        this.core.stats.increment('outgoing-data', JSON.stringify(outgoingPayload).length / 1024 / 1024)
       }
     } catch (e) { /* yolo */ }
   }
@@ -307,6 +443,28 @@ class MainServer extends WsServer {
     */
   reply(payload, socket) {
     this.send(payload, socket);
+  }
+
+  /**
+   * 向目标Socket发送一个info
+   * @param {String} text 信息
+   * @param {ws#WebSocket} socket 目标Socket
+   */
+  replyInfo(text, socket) {
+    this.reply({
+      cmd: 'info', text,
+    }, socket)
+  }
+
+  /**
+   * 向目标Socket发送一个warn
+   * @param {String} text 信息
+   * @param {ws#WebSocket} socket 目标Socket
+   */
+  replyWarn(text, socket) {
+    this.reply({
+      cmd: 'warn', text,
+    }, socket)
   }
 
   /**
@@ -333,6 +491,18 @@ class MainServer extends WsServer {
     }
 
     return true;
+  }
+
+  /**
+   * 向符合规则的Socket发送一个info
+   * @param {String} text 信息
+   * @param {Object} filter 过滤规则
+   * @return {Boolean}
+   */
+  broadcastInfo(text, filter) {
+    return this.broadcast({
+      cmd: 'info', text,
+    }, filter)
   }
 
   /**

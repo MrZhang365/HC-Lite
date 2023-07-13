@@ -6,28 +6,12 @@ import * as UAC from '../utility/UAC/_info';
 
 // module main
 export async function run(core, server, socket) {
-  // increase rate limit chance and ignore if not admin or mod
-  if (!UAC.isModerator(socket.level)) {
-    return server.police.frisk(socket.address, 10);
-  }
-
-  // remove arrest records
-  server.police.clear();
-
-  core.stats.set('users-banned', 0);
-
-  console.log(`${socket.nick} [${socket.trip}] unbanned all`);
-
-  // reply with success
-  server.reply({
-    cmd: 'info',
-    text: 'Unbanned all ip addresses',
-  }, socket);
+  server.unbanall()
 
   // notify mods
   server.broadcast({
     cmd: 'info',
-    text: `${socket.nick}#${socket.trip} unbanned all ip addresses`,
+    text: `${socket.nick} 解封了所有IP地址`,
   }, { level: UAC.isModerator });
 
   return true;
@@ -35,7 +19,11 @@ export async function run(core, server, socket) {
 
 export const info = {
   name: 'unbanall',
-  description: 'Clears all banned ip addresses',
+  description: '解封所有IP地址',
   usage: `
-    API: { cmd: 'unbanall' }`,
+    API: { cmd: 'unbanall' }
+    以聊天形式发送 /unbanall`,
+  runByChat: true,
+  dataRules: [],
+  level: UAC.levels.moderator,
 };

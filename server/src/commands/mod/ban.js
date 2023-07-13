@@ -6,71 +6,40 @@ import * as UAC from '../utility/UAC/_info';
 
 // module main
 export async function run(core, server, socket, data) {
-  // increase rate limit chance and ignore if not admin or mod
-  if (!UAC.isModerator(socket.level)) {
-    return server.police.frisk(socket.address, 10);
-  }
-
-  // check user input
-  if (typeof data.nick !== 'string') {
-    return true;
-  }
-
   // find target user
   const targetNick = data.nick;
-  let badClient = server.findSockets({ channel: socket.channel, nick: targetNick });
+  let badClient = server.findSockets({ nick: targetNick })[0];
 
-  if (badClient.length === 0) {
-    return server.reply({
-      cmd: 'warn',
-      text: 'Could not find user in channel',
-    }, socket);
+  if (!badClient) {
+    return server.replyWarn(`找不到目标用户`, socket)
   }
 
-  [badClient] = badClient;
+  if (server.findSockets({ address: badClient.address, level: l => l >= socket.level }).length > 0) return server.replyWarn(`有同级或更高等级的用户和目标用户共用一个IP地址`, socket)
 
-  // i guess banning mods or admins isn't the best idea?
-  if (badClient.level >= socket.level) {
-    return server.reply({
-      cmd: 'warn',
-      text: 'Cannot ban other users of the same level, how rude',
-    }, socket);
-  }
-
-  // commit arrest record
-  server.police.arrest(badClient.address, badClient.hash);
-
-  console.log(`${socket.nick} [${socket.trip}] banned ${targetNick} in ${socket.channel}`);
-
-  // notify normal users
-  server.broadcast({
-    cmd: 'info',
-    text: `Banned ${targetNick}`,
-    user: UAC.getUserDetails(badClient),
-  }, { channel: socket.channel, level: (level) => level < UAC.levels.moderator });
-
-  // notify mods
-  server.broadcast({
-    cmd: 'info',
-    text: `${socket.nick}#${socket.trip} banned ${targetNick} in ${socket.channel}, userhash: ${badClient.hash}`,
-    channel: socket.channel,
-    user: UAC.getUserDetails(badClient),
-    banner: UAC.getUserDetails(socket),
-  }, { level: UAC.isModerator });
+  server.ban(badClient.address)
+  
+  server.broadcastInfo(`${socket.nick} 封禁了 ${targetNick}，目标IP：${badClient.address}`, { level: UAC.isModerator })
+  server.broadcastInfo(`已封禁 ${targetNick}`, { joined: true, level: l => l < UAC.levels.moderator })
 
   // force connection closed
   badClient.terminate();
-
-  // stats are fun
-  core.stats.increment('users-banned');
-
   return true;
 }
 
-export const requiredData = ['nick'];
 export const info = {
   name: 'ban',
-  description: 'Disconnects the target nickname in the same channel as calling socket & adds to ratelimiter',
+  description: '封禁一个用户',
   usage: `
-    API: { cmd: 'ban', nick: '<target nickname>' }`,
+    API: { cmd: 'ban', nick: '<target nickname>' }
+    以聊天形式发送 /ban 目标用户`,
+  runByChat: true,
+  dataRules: [
+    {
+      name: 'nick',
+      verify: UAC.verifyNickname,
+      errorMessage: UAC.nameLimit.nick,
+      required: true,
+    }
+  ],
+  level: UAC.levels.moderator,
 };

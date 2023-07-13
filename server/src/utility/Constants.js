@@ -15,5 +15,5 @@ exports.RateLimits = {
   * @property {number} PulseSpeed Time in milliseconds to ping each client
   */
 exports.ServerConst = {
-  PulseSpeed: 16 * 1000,
+  PulseSpeed: 20 * 1000,
 };

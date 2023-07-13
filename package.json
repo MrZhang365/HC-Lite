@@ -1,11 +1,11 @@
 {
-  "name": "hack.chat-v2",
-  "version": "2.1.93",
-  "description": "a minimal distraction free chat application",
-  "main": "index.js",
+  "name": "hc-light",
+  "version": "1.0.0",
+  "description": "轻量版hack.chat",
+  "main": "server/main.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hack-chat/main.git"
+    "url": "git+https://github.com/MrZhang365/HC-Light.git"
   },
   "engines": {
     "node": ">= 10.15.1",
@@ -14,17 +14,26 @@
   "scripts": {
     "start": "pm2 startOrReload pm2.config.js",
     "stop": "pm2 stop pm2.config.js && pm2 delete pm2.config.js",
+    "config": "node -r esm server/src/scripts/configure.js",
+    "postinstall": "npm run config",
     "logs": "pm2 logs",
     "clear": "pm2 flush",
     "status": "pm2 list",
-    "refresh": "pm2 flush && pm2 stop pm2.config.js && pm2 delete pm2.config.js",
-    "postinstall": "cd ./server && npm install && npm run config"
+    "refresh": "pm2 flush && pm2 stop pm2.config.js && pm2 delete pm2.config.js"
   },
-  "author": "Marzavec",
-  "license": "WTFPL",
+  "author": "MrZhang365",
+  "license": "Apache-20",
   "dependencies": {
+    "chalk": "^3.0.0",
+    "common-tags": "^1.8.0",
+    "dateformat": "^3.0.3",
+    "didyoumean2": "^4.0.0",
     "esm": "^3.2.25",
-    "http-server": "^0.12.1",
-    "pm2": "^5.2.0"
+    "fs-extra": "^8.1.0",
+    "mime-types": "^2.1.35",
+    "pm2": "^5.2.0",
+    "prompt": "^1.0.0",
+    "readdir-recursive": "^0.0.4",
+    "ws": "^7.2.3"
   }
 }
