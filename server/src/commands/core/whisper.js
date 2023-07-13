@@ -36,7 +36,7 @@ export async function run(core, server, socket, payload) {
   const targetNick = payload.nick;
 
   // find target user
-  let targetClient = server.findSockets({ channel: socket.channel, nick: targetNick });
+  let targetClient = server.findSockets({ nick: targetNick });
 
   if (targetClient.length === 0) {
     return server.replyWarn(`找不到目标用户`, socket)
