@@ -15,7 +15,7 @@ export async function run(core, server, socket, data) {
     server.broadcast({
       cmd: 'onlineRemove',
       nick: socket.nick,
-    }, { channel: socket.channel });
+    }, { joined: true });
   }
 
   // commit close just in case
